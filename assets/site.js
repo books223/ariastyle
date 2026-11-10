@@ -1,0 +1,62 @@
+(()=>{'use strict';
+const KEY_CART='ariastyle_cart_v2',KEY_WISH='ariastyle_wishlist_v1';
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const digits=s=>String(s||'').replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+const number=s=>Number(digits(s).replace(/[^0-9]/g,''))||0;
+const money=n=>new Intl.NumberFormat('fa-IR').format(n)+' تومان';
+const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const read=(key)=>{try{const x=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(x)?x:[]}catch(e){return[]}};
+const write=(key,val)=>{try{localStorage.setItem(key,JSON.stringify(val))}catch(e){toast('ذخیره‌سازی مرورگر در دسترس نیست.')}};
+let cart=read(KEY_CART),wish=read(KEY_WISH);
+function toast(msg){let el=$('.as-toast');if(!el){el=document.createElement('div');el.className='as-toast';el.setAttribute('role','status');document.body.appendChild(el)}el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2300)}
+function product(card){const name=$('.product-name',card)?.textContent.trim()||card.dataset.name||'محصول آریاستایل';const img=$('.product-img img, img',card)?.getAttribute('src')||'assets/products/product-01.jpg';const priceText=$('.price-current',card)?.textContent||card.dataset.price||'';const price=number(priceText);const id=card.dataset.productId||name+'|'+img;return{id,name,img,price,priceText:priceText.trim()||money(price),qty:1}}
+function updateBadges(){const cc=cart.reduce((n,x)=>n+x.qty,0);const wb=wish.length;const cb=$('[data-open-panel="cartPanel"] .badge');const hb=$('[data-open-panel="wishlistPanel"] .badge');if(cb)cb.textContent=new Intl.NumberFormat('fa-IR').format(cc);if(hb)hb.textContent=new Intl.NumberFormat('fa-IR').format(wb);const hc=$('#cartHeadingCount');if(hc)hc.textContent=new Intl.NumberFormat('fa-IR').format(cc)+' کالا';const wc=$('#wishlistHeadingCount');if(wc)wc.textContent=new Intl.NumberFormat('fa-IR').format(wb)+' کالا'}
+function openPanel(id){const p=$('#'+id);if(!p)return;$$('.store-panel-backdrop').forEach(x=>{x.classList.remove('is-open');x.setAttribute('aria-hidden','true')});p.classList.add('is-open');p.setAttribute('aria-hidden','false');document.body.classList.add('panel-is-open');$('input,button',p)?.focus({preventScroll:true})}
+function closePanels(){ $$('.store-panel-backdrop').forEach(x=>{x.classList.remove('is-open');x.setAttribute('aria-hidden','true')});document.body.classList.remove('panel-is-open') }
+function renderCart(){const list=$('#cartItems');if(!list)return;const count=cart.reduce((n,x)=>n+x.qty,0),total=cart.reduce((n,x)=>n+x.price*x.qty,0);const summary=$('#cartSummary');if(summary)summary.hidden=!cart.length;if(!cart.length){list.innerHTML='<div class="cart-empty"><div class="cart-empty-icon"><i class="fas fa-shopping-bag"></i></div><h3>سبد خرید شما خالی است</h3><p>با افزودن محصولات، خرید را شروع کنید.</p><button type="button" class="panel-secondary-btn" data-close-panel>مشاهده محصولات</button></div>'}else{list.innerHTML=cart.map(x=>`<article class="cart-item" data-cart-id="${encodeURIComponent(x.id)}"><img src="${escapeHTML(x.img)}" alt="${escapeHTML(x.name)}"><div class="cart-item-info"><h3>${escapeHTML(x.name)}</h3><strong>${money(x.price)}</strong><div class="cart-item-controls"><button type="button" data-qty="-1" aria-label="کاهش تعداد">−</button><span>${new Intl.NumberFormat('fa-IR').format(x.qty)}</span><button type="button" data-qty="1" aria-label="افزایش تعداد">+</button><button type="button" class="cart-remove" data-remove-item>حذف</button></div></div></article>`).join('')};const sub=$('#cartSubtotal'),tot=$('#cartTotal');if(sub)sub.textContent=money(total);if(tot)tot.textContent=money(total);updateBadges()}
+function renderWish(){const list=$('#wishlistItems');if(!list)return;if(!wish.length){list.innerHTML='<div class="wishlist-empty"><div class="wishlist-empty-icon"><i class="far fa-heart"></i></div><h3>هنوز محصولی ذخیره نکرده‌اید</h3><p>با زدن قلب کنار هر محصول، آن را به علاقه‌مندی‌ها اضافه کنید.</p><button class="panel-secondary-btn" data-close-panel type="button">مشاهده محصولات</button></div>'}else{list.innerHTML=wish.map(x=>`<article class="wishlist-item" data-wishlist-id="${encodeURIComponent(x.id)}"><img src="${escapeHTML(x.img)}" alt="${escapeHTML(x.name)}"><div class="wishlist-item-info"><h3>${escapeHTML(x.name)}</h3><strong>${money(x.price)}</strong></div><button class="wishlist-remove" type="button" data-wishlist-remove>حذف</button></article>`).join('')};updateBadges()}
+function syncWish(){ $$('.action-btn.wish').forEach(b=>{const c=b.closest('.product-card');if(!c)return;const p=product(c),on=wish.some(x=>x.id===p.id),i=$('i',b);b.classList.toggle('is-wished',on);if(i){i.classList.toggle('fas',on);i.classList.toggle('far',!on);i.style.color=on?'#e94560':''}});updateBadges() }
+function persistCart(){write(KEY_CART,cart);renderCart()};function persistWish(){write(KEY_WISH,wish);renderWish();syncWish()}
+// Header panels and delegated product actions.
+document.addEventListener('click',e=>{
+ const opener=e.target.closest('[data-open-panel]');if(opener){e.preventDefault();const id=opener.dataset.openPanel;if(id==='cartPanel')renderCart();if(id==='wishlistPanel')renderWish();openPanel(id);return}
+ if(e.target.closest('[data-close-panel]')){closePanels();return}
+ const wishBtn=e.target.closest('.action-btn.wish');if(wishBtn){e.preventDefault();const c=wishBtn.closest('.product-card');if(!c)return;const p=product(c);const exists=wish.some(x=>x.id===p.id);wish=exists?wish.filter(x=>x.id!==p.id):[...wish,p];persistWish();toast(exists?'از علاقه‌مندی‌ها حذف شد':'به علاقه‌مندی‌ها اضافه شد');return}
+ const cartBtn=e.target.closest('.action-btn.cart');if(cartBtn){e.preventDefault();const c=cartBtn.closest('.product-card');if(!c)return;const p=product(c);const found=cart.find(x=>x.id===p.id);if(found)found.qty++;else cart.push(p);persistCart();toast('محصول به سبد خرید اضافه شد');const old=cartBtn.innerHTML;cartBtn.innerHTML='<i class="fas fa-check"></i> اضافه شد';setTimeout(()=>cartBtn.innerHTML=old,900);return}
+ const row=e.target.closest('[data-cart-id]');if(row){const id=decodeURIComponent(row.dataset.cartId),item=cart.find(x=>x.id===id);if(!item)return;const q=e.target.closest('[data-qty]');if(q){item.qty+=Number(q.dataset.qty);if(item.qty<1)cart=cart.filter(x=>x.id!==id);persistCart();return}if(e.target.closest('[data-remove-item]')){cart=cart.filter(x=>x.id!==id);persistCart();return}}
+ const remove=e.target.closest('[data-wishlist-remove]');if(remove){const row=remove.closest('[data-wishlist-id]'),id=decodeURIComponent(row.dataset.wishlistId);wish=wish.filter(x=>x.id!==id);persistWish();return}
+ const menu=e.target.closest('.mobile-menu-btn');if(menu){const nav=$('.nav-wrapper');nav?.classList.toggle('mobile-open');menu.setAttribute('aria-expanded',nav?.classList.contains('mobile-open')?'true':'false');return}
+ const navLink=e.target.closest('.nav-item > .nav-link');if(navLink&&window.innerWidth<=900){const item=navLink.parentElement;if($('.mega-menu',item)){if(!item.classList.contains('menu-expanded')){e.preventDefault();$$('.nav-item.menu-expanded').forEach(x=>{if(x!==item)x.classList.remove('menu-expanded')});item.classList.add('menu-expanded');return}}}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanels()});
+document.addEventListener('click',e=>{
+ const nav=$('.nav-wrapper');
+ if(!nav||window.innerWidth>768)return;
+ if(!e.target.closest('.main-header')&&!e.target.closest('.nav-wrapper')){
+   nav.classList.remove('mobile-open');
+   $$('.nav-item.menu-expanded').forEach(x=>x.classList.remove('menu-expanded'));
+   $('.mobile-menu-btn')?.setAttribute('aria-expanded','false');
+ }
+ const destination=e.target.closest('.mega-menu a');
+ if(destination){
+   nav.classList.remove('mobile-open');
+   $$('.nav-item.menu-expanded').forEach(x=>x.classList.remove('menu-expanded'));
+   $('.mobile-menu-btn')?.setAttribute('aria-expanded','false');
+ }
+});
+$$('.store-panel-backdrop').forEach(p=>p.addEventListener('click',e=>{if(e.target===p)closePanels()}));
+const header=$('#mainHeader');if(header){const shadow=()=>header.classList.toggle('scrolled',window.scrollY>30);window.addEventListener('scroll',shadow,{passive:true});shadow()}
+// Search submits to the local results page.
+const search=$('.search-box');if(search){const input=$('input',search),btn=$('button',search);const go=()=>{const q=input?.value.trim();if(q)location.href='search.html?q='+encodeURIComponent(q)};btn?.addEventListener('click',go);input?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();go()}})}
+// Collection page filter/search/sort.
+const grid=$('.tshirt-products-grid')||$('.products-grid');const filters=$$('.tshirt-filter');const sort=$('#tshirtSort');const filterSearch=$('#tshirtSearch');let activeFilter='all';function filterProducts(){if(!grid)return;let cards=$$('.product-card',grid);const q=(filterSearch?.value||'').trim().toLowerCase();cards.forEach(c=>{const text=c.textContent.toLowerCase();const tags=(c.dataset.tags||'').toLowerCase();const okq=!q||text.includes(q);const okf=activeFilter==='all'||text.includes(activeFilter.toLowerCase())||tags.includes(activeFilter.toLowerCase());c.hidden=!(okq&&okf)});if(sort){cards.sort((a,b)=>{const pa=number($('.price-current',a)?.textContent),pb=number($('.price-current',b)?.textContent);if(sort.value==='price-asc')return pa-pb;if(sort.value==='price-desc')return pb-pa;if(sort.value==='name')return($('.product-name',a)?.textContent||'').localeCompare($('.product-name',b)?.textContent||'','fa');return 0});cards.forEach(c=>grid.appendChild(c))}}
+filters.forEach(b=>b.addEventListener('click',()=>{filters.forEach(x=>x.classList.remove('active'));b.classList.add('active');activeFilter=b.dataset.filter||b.textContent.trim();if(activeFilter==='همه')activeFilter='all';filterProducts()}));filterSearch?.addEventListener('input',filterProducts);sort?.addEventListener('change',filterProducts);
+// Demo login: clearly states backend is required, never pretends to authenticate.
+$('#loginForm')?.addEventListener('submit',e=>{e.preventDefault();const m=$('#loginMessage');if(m)m.textContent='برای ورود واقعی، سرویس احراز هویت و پایگاه داده باید روی سرور متصل شود.'});$('#showSignup')?.addEventListener('click',e=>{e.preventDefault();const m=$('#loginMessage');if(m)m.textContent='ثبت‌نام آنلاین پس از اتصال بک‌اند فعال می‌شود.'});$('#forgotPassword')?.addEventListener('click',e=>{e.preventDefault();const m=$('#loginMessage');if(m)m.textContent='بازیابی رمز عبور پس از اتصال سرویس احراز هویت فعال می‌شود.'});
+$('#checkoutButton')?.addEventListener('click',()=>{if(!cart.length){toast('سبد خرید خالی است');return}location.href='checkout.html'});
+// Checkout demo: cart is persistent, but order submission is intentionally disabled without a backend.
+if($('#checkoutItems')){const box=$('#checkoutItems');const total=cart.reduce((s,x)=>s+x.price*x.qty,0);box.innerHTML=cart.length?cart.map(x=>`<div class="as-cart-row"><img src="${escapeHTML(x.img)}" alt=""><div class="as-cart-row-info"><strong>${escapeHTML(x.name)}</strong><p>${x.qty} × ${money(x.price)}</p></div></div>`).join(''):'<p>سبد خرید شما خالی است. <a href="index.html">بازگشت به فروشگاه</a></p>';$('#checkoutTotal')&&($('#checkoutTotal').textContent=money(total));$('#checkoutForm')?.addEventListener('submit',e=>{e.preventDefault();toast('برای ثبت سفارش و پرداخت واقعی، بک‌اند و درگاه پرداخت لازم است.');$('#checkoutNotice').textContent='این فرم نمایشی است و هیچ سفارش یا پرداختی ثبت نشده است.'})}
+// Product detail page takes safe, URL-encoded presentation values.
+if($('#productDetail')){const p=new URLSearchParams(location.search);const name=p.get('name')||'محصول آریاستایل';const price=p.get('price')||'تماس بگیرید';const image=p.get('image')||'product-01.jpg';$('#detailName').textContent=name;$('#detailPrice').textContent=price+' تومان';$('#detailImage').src='assets/products/'+image;$('#detailImage').alt=name;$('#detailAdd').addEventListener('click',()=>{const id=p.get('id')||name;const n=number(price);const item=cart.find(x=>x.id===id);if(item)item.qty++;else cart.push({id,name,price:n,img:'assets/products/'+image,qty:1});persistCart();toast('محصول به سبد خرید اضافه شد')})}
+renderCart();renderWish();syncWish();
+})();
